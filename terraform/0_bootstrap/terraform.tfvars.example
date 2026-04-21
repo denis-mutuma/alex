@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars (gitignored pattern) for bootstrap apply.
+
+aws_region = "us-east-1"
+
+# GitHub repository that may assume the deploy role: owner/repo (no https://)
+github_repository = "your-github-username/alex"

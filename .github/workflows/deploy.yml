@@ -1,0 +1,84 @@
+name: Deploy Alex (Part 7)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Part 7 frontend + API
+    runs-on: ubuntu-latest
+    env:
+      TF_STATE_BUCKET: alex-terraform-state-${{ secrets.AWS_ACCOUNT_ID }}
+      DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
+      AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: alex-github-actions-deploy
+          aws-region: ${{ secrets.DEFAULT_AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Add uv to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Production env for Next.js (Clerk)
+        working-directory: frontend
+        env:
+          PK: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$PK" || (echo "Missing secret NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" && exit 1)
+          echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$PK" > .env.production
+
+      - name: Run deploy
+        env:
+          GITHUB_ACTIONS: "true"
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_clerk_jwks_url: ${{ secrets.TF_VAR_clerk_jwks_url }}
+          TF_VAR_clerk_issuer: ${{ secrets.TF_VAR_clerk_issuer }}
+        run: |
+          test -n "${{ secrets.TF_VAR_clerk_jwks_url }}" || (echo "Set TF_VAR_clerk_jwks_url" && exit 1)
+          test -n "${{ secrets.TF_VAR_clerk_issuer }}" || (echo "Set TF_VAR_clerk_issuer" && exit 1)
+          python3 scripts/deploy.py
+
+      - name: Deployment URLs
+        working-directory: terraform/7_frontend
+        run: |
+          echo "CloudFront=$(terraform output -raw cloudfront_url)"
+          echo "API=$(terraform output -raw api_gateway_url)"

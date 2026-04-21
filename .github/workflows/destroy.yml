@@ -1,0 +1,49 @@
+name: Destroy Alex (Part 7)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type destroy-part7 to confirm"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy:
+    name: Destroy Part 7 stack
+    runs-on: ubuntu-latest
+    env:
+      TF_STATE_BUCKET: alex-terraform-state-${{ secrets.AWS_ACCOUNT_ID }}
+      DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
+      AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "destroy-part7" ]; then
+            echo "Input must be exactly: destroy-part7"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: alex-github-actions-destroy
+          aws-region: ${{ secrets.DEFAULT_AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Destroy
+        env:
+          TF_VAR_clerk_jwks_url: ${{ secrets.TF_VAR_clerk_jwks_url }}
+          TF_VAR_clerk_issuer: ${{ secrets.TF_VAR_clerk_issuer }}
+        run: python3 scripts/destroy.py --yes
