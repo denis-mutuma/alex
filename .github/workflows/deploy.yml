@@ -1,4 +1,4 @@
-name: Deploy Alex (Part 7)
+name: deploy alex
 
 on:
   push:
@@ -11,20 +11,17 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy Part 7 frontend + API
+    name: deploy alex
     runs-on: ubuntu-latest
     env:
-      TF_STATE_BUCKET: alex-terraform-state-${{ secrets.AWS_ACCOUNT_ID }}
-      # Must match Part 7 remote_state_bucket / deploy.py so Terraform can resolve Part 5/6 state in S3
-      TF_VAR_remote_state_bucket: alex-terraform-state-${{ secrets.AWS_ACCOUNT_ID }}
       DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
       AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: alex-github-actions-deploy
@@ -33,8 +30,16 @@ jobs:
       - name: Verify AWS identity
         run: aws sts get-caller-identity
 
+      # Bucket name must match terraform/0_bootstrap and the OIDC role's account (not a separate secret).
+      - name: Terraform state bucket from AWS account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "Terraform state bucket: alex-terraform-state-${ACCOUNT_ID}"
+          echo "TF_STATE_BUCKET=alex-terraform-state-${ACCOUNT_ID}" >> "$GITHUB_ENV"
+          echo "TF_VAR_remote_state_bucket=alex-terraform-state-${ACCOUNT_ID}" >> "$GITHUB_ENV"
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -45,14 +50,14 @@ jobs:
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -71,7 +76,6 @@ jobs:
       - name: Run deploy
         env:
           GITHUB_ACTIONS: "true"
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           TF_VAR_clerk_jwks_url: ${{ secrets.TF_VAR_clerk_jwks_url }}
           TF_VAR_clerk_issuer: ${{ secrets.TF_VAR_clerk_issuer }}
         run: |
