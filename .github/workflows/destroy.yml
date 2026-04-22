@@ -1,4 +1,4 @@
-name: Destroy Alex (Part 7)
+name: destroy alex
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   destroy:
-    name: Destroy Part 7 stack
+    name: destroy alex
     runs-on: ubuntu-latest
     env:
       DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
