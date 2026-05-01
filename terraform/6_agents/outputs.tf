@@ -1,3 +1,8 @@
+output "lambda_packages_bucket" {
+  description = "S3 bucket holding Lambda deployment packages"
+  value       = aws_s3_bucket.lambda_packages.id
+}
+
 output "sqs_queue_url" {
   description = "URL of the SQS queue for job submission"
   value       = aws_sqs_queue.analysis_jobs.url

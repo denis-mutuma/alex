@@ -1,10 +1,10 @@
-name: destroy alex
+name: destroy alex stacks
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type destroy-part7 to confirm"
+        description: "Type destroy-alex to confirm (destroys stacks 8_enterprise → 2_sagemaker; keeps 0_bootstrap)"
         required: true
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   destroy:
-    name: destroy alex
+    name: destroy alex workload stacks
     runs-on: ubuntu-latest
     env:
       DEFAULT_AWS_REGION: ${{ secrets.DEFAULT_AWS_REGION }}
@@ -21,8 +21,8 @@ jobs:
     steps:
       - name: Check confirmation
         run: |
-          if [ "${{ github.event.inputs.confirm }}" != "destroy-part7" ]; then
-            echo "Input must be exactly: destroy-part7"
+          if [ "${{ github.event.inputs.confirm }}" != "destroy-alex" ]; then
+            echo "Input must be exactly: destroy-alex"
             exit 1
           fi
 
@@ -47,8 +47,20 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Destroy
+      - name: Destroy all workload stacks (8 → 2)
         env:
-          TF_VAR_clerk_jwks_url: ${{ secrets.TF_VAR_clerk_jwks_url }}
-          TF_VAR_clerk_issuer: ${{ secrets.TF_VAR_clerk_issuer }}
+          TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_clerk_jwks_url: ${{ secrets.TF_VAR_clerk_jwks_url || 'https://example.com/.well-known/jwks.json' }}
+          TF_VAR_clerk_issuer: ${{ secrets.TF_VAR_clerk_issuer || 'https://example.com' }}
+          TF_VAR_openai_api_key: ${{ secrets.TF_VAR_openai_api_key || secrets.OPENAI_API_KEY || 'dummy-openai-key-destroy' }}
+          TF_VAR_alex_api_endpoint: ${{ secrets.TF_VAR_alex_api_endpoint || 'https://dummy.invalid/ingest' }}
+          TF_VAR_alex_api_key: ${{ secrets.TF_VAR_alex_api_key || 'dummy-api-key-destroy' }}
+          TF_VAR_aurora_cluster_arn: ${{ secrets.TF_VAR_aurora_cluster_arn || 'arn:aws:rds:us-east-1:000000000000:cluster:dummy-destroy' }}
+          TF_VAR_aurora_secret_arn: ${{ secrets.TF_VAR_aurora_secret_arn || 'arn:aws:secretsmanager:us-east-1:000000000000:secret:dummy-destroy' }}
+          TF_VAR_vector_bucket: ${{ secrets.TF_VAR_vector_bucket || 'dummy-vector-bucket-destroy' }}
+          TF_VAR_polygon_api_key: ${{ secrets.TF_VAR_polygon_api_key || 'dummy-polygon-destroy' }}
+          TF_VAR_bedrock_model_id: ${{ secrets.TF_VAR_bedrock_model_id || 'amazon.nova-lite-v1:0' }}
+          TF_VAR_bedrock_region: ${{ secrets.TF_VAR_bedrock_region || env.AWS_REGION }}
+          TF_VAR_sagemaker_endpoint: ${{ secrets.TF_VAR_sagemaker_endpoint || 'alex-embedding-endpoint' }}
+          TF_VAR_sagemaker_endpoint_name: ${{ secrets.TF_VAR_sagemaker_endpoint_name || 'alex-embedding-endpoint' }}
         run: python3 scripts/destroy.py --yes
